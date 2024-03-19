@@ -1,0 +1,510 @@
+#define _CRT_SECURE_NO_WARNINGS
+#include <iostream>
+#include <fstream>
+#include <sstream>
+constexpr int MAX_ROWS = 50;
+constexpr int MAX_COLS = 30;
+constexpr char DEFINE_TABLE[8] = "<table>";
+constexpr int MAX_SIZE_ROWS = 300;
+constexpr int MAX_SYMBOLS_IN_COL = 50;
+
+bool isDigit(char ch) {
+	return ch >= '0' && ch <= '9';
+}
+
+namespace Constants {
+	char table[8] = "<table>";
+	char zaglavnoPole[5] = "<th>";
+	char row[5] = "<tr>";
+	char col[5] = "<td>";
+
+	char tableEnd[9] = "</table>";
+	char zaglavnoPoleEnd[6] = "</th>";
+	char rowEnd[6] = "</tr>";
+	char colEnd[7] = "</td>";
+}
+using namespace Constants;
+
+class Table {
+private:
+	char table[MAX_SIZE_ROWS][MAX_COLS][50];
+	unsigned rows_count;
+	unsigned cols_count;
+	bool isHeader[MAX_SIZE_ROWS][MAX_COLS]{ false };
+public:
+	Table() :rows_count(0), cols_count(0) {
+		for (int i = 0; i < MAX_SIZE_ROWS; ++i) {
+			for (int j = 0; j < MAX_COLS; ++j) {
+				strcpy(table[i][j], "");
+			}
+		}
+	}
+
+	void setHeader(unsigned row, unsigned col, bool isHeaderCell) {
+		if (row < MAX_SIZE_ROWS && col < MAX_COLS) {
+			isHeader[row][col] = isHeaderCell;
+		}
+	}
+
+	// Getter for checking if a specific cell is a header
+	bool isCellHeader(unsigned row, unsigned col) const {
+		if (row < MAX_SIZE_ROWS && col < MAX_COLS) {
+			return isHeader[row][col];
+		}
+		return false; // Return false if out of bounds
+	}
+
+	const unsigned getRows() const {
+		return rows_count;
+	}
+
+	const unsigned getCols()const {
+		return cols_count;
+	}
+
+	void setRows(unsigned rows) {
+		rows_count = rows;
+	}
+
+	void setCol(unsigned cols) {
+		cols_count = cols;
+	}
+
+	//void setTable(char* new_table[MAX_SIZE_ROWS][MAX_COLS], unsigned new_rows, unsigned new_cols) {
+	//	for (int i = 0; i < new_rows; ++i) {
+	//		for (int j = 0; j < new_cols; ++j) {
+	//			// Copy each element of the new table into the current table
+	//			// Assuming each element is a null-terminated string
+	//			size_t len = strlen(new_table[i][j]) + 1; // +1 for the null terminator
+	//			//table[i][j] = new char[len];
+	//			strcpy(table[i][j][50], new_table[i][j][50]);
+	//		}
+	//	}
+	//	rows_count = new_rows;
+	//	cols_count = new_cols;
+	//}
+
+	void getTag(char* str, char* newBuff) {
+		if (strlen(str) < 3) {
+			return;
+		} //3 is the minimal size of tag;
+		std::stringstream ss(str);
+		char buff[1024];
+		//size_t size = sizeOfFile(ss);
+		while (true) {
+
+			char current = ss.get();
+			if (current == '<') {
+				ss.seekg(-1, std::ios::cur);
+				ss.getline(newBuff, 1024, '>');
+				break;
+			}
+
+		}
+
+	}
+
+	size_t sizeOfFile(std::ifstream& ifs) {
+		size_t currentPos = ifs.tellg();
+		ifs.seekg(0, std::ios::end);
+		size_t size = ifs.tellg();
+		ifs.seekg(0, std::ios::beg);
+		return size;
+	}
+
+	void getRowsCount(std::ifstream& ifs) {
+		unsigned rowCount = 0;
+		bool insideTag = false;
+		bool foundStartTag = false;
+		bool foundEndTag = false;
+		char buff[2048];
+		char newBuff[2048];
+
+		size_t lastIndexofFile = sizeOfFile(ifs);
+		while (!ifs.eof()) {
+			unsigned pos = ifs.tellg();
+			//ifs.seekg(-1, std::ios::cur);
+			ifs.getline(buff, 1024, '>');
+
+
+			getTag(buff, newBuff);
+			if (strcmp(newBuff, "</table") == 0) {
+				break;
+			}
+
+			if (strcmp(newBuff, "<tr") == 0) {
+				foundStartTag = true;
+				insideTag = true;
+			}
+			else if (strcmp(newBuff, "</tr") == 0) {
+				foundEndTag = true;
+				insideTag = false;
+			}
+
+			if (foundStartTag && foundEndTag) {
+				rowCount++;
+				foundEndTag = false;
+				foundStartTag = false;
+			}
+		}
+
+		setRows(rowCount);
+		ifs.seekg(0, std::ios::beg);
+		ifs.clear();
+	}
+
+	unsigned getColsCount2(std::ifstream& ifs) {
+		unsigned colsCount = 0;
+		bool insideTag = false;
+		bool foundStartTag = false;
+		bool foundEndTag = false;
+		char buff[1024];
+		char newBuff[1024];
+		
+		//unsigned colsPerRowArr=getRows();
+
+
+
+		while (true) {
+			ifs.getline(buff, 1024, '>');
+
+			getTag(buff, newBuff);
+			if (strcmp(newBuff, "</tr") == 0) {
+				break;
+			}
+			if (strcmp(newBuff, "</table") == 0) {
+				break;
+			}
+			if (strcmp(newBuff, "<td") == 0 || strcmp(newBuff, "<th") == 0) {
+				foundStartTag = true;
+				insideTag = true;
+			}
+			else if (strcmp(newBuff, "</td") == 0 || strcmp(newBuff, "</th") == 0) {
+				
+				foundEndTag = true;
+				insideTag = false;
+			}
+
+			if (foundStartTag && foundEndTag) {
+				colsCount++;
+				foundEndTag = false;
+				foundStartTag = false;
+			}
+		}
+
+		return colsCount;
+
+	}
+
+	void getColPerRow(std::ifstream& ifs) {
+		unsigned rowCount = 0;
+		bool insideTag = false;
+		bool foundStartTag = false;
+		bool foundEndTag = false;
+		char buff[2048];
+		char newBuff[2048];
+
+		unsigned colsCount[1024];
+		int index = 0;
+		size_t lastIndexofFile = sizeOfFile(ifs);
+		while (!ifs.eof()) {
+			unsigned pos = ifs.tellg();
+			//ifs.seekg(-1, std::ios::cur);
+
+			char ch;
+			ch = ifs.get();
+			if (ch == '\n') {
+				//ifs.ignore();
+			}
+			else {
+				ifs.seekg(-1, std::ios::cur);
+			}
+
+			ifs.getline(buff, 1024, '>');
+
+
+
+			getTag(buff, newBuff);
+			if (strcmp(newBuff, "</table") == 0) {
+				break;
+			}
+
+			if (strcmp(newBuff, "<tr") == 0) {
+				foundStartTag = true;
+				insideTag = true;
+
+				colsCount[index] = getColsCount2(ifs);
+				index++;
+			}
+			else if (strcmp(newBuff, "</tr") == 0) {
+				foundEndTag = true;
+				insideTag = false;
+			}
+
+			if (foundStartTag && foundEndTag) {
+				rowCount++;
+				foundEndTag = false;
+				foundStartTag = false;
+			}
+		}
+
+		short maxColNum = 0;
+		for (int i = 0; i < index; i++)
+		{
+			if (maxColNum < colsCount[i]) {
+				maxColNum = colsCount[i];
+			}
+		}
+
+		setCol(maxColNum);
+		ifs.seekg(0, std::ios::beg);
+		ifs.clear();
+	}
+
+	bool isStartTag(const char* tag, const char* buff) {
+		return (strcmp(tag, buff) == 0);
+	}
+
+	bool isEndTag(const char* endTag, const char* buff) {
+		return strcmp(endTag, buff) == 0;
+	}
+
+	char* getContentOfCol(const char* currentColContent) {
+		char buff[1024];
+		std::stringstream ss(currentColContent);
+		unsigned startOfWord = ss.tellg();
+		ss.getline(buff, 1024, '<');
+		unsigned EndOfWord = ss.tellg();
+		unsigned sizeOfResult = EndOfWord - startOfWord;
+
+		char* resultToStore = new char[sizeOfResult];
+		strcpy(resultToStore, buff);
+		ss.seekg(4, std::ios::beg);
+
+		return resultToStore;
+
+	}
+
+	void isNewLineSymbol(std::ifstream& ifs) {
+		char ch;
+		ch = ifs.get();
+		if (ch == '\n') {
+			//ifs.ignore();
+		}
+		else {
+			ifs.seekg(-1, std::ios::cur);
+		}
+	}
+
+	void ReadFileIntoTable(std::ifstream& ifs, Table& table) {
+		char buff[2048];
+		char newBuff[2048];
+
+		char readingThroughFile[2048];
+
+		unsigned indexRow = 0;
+		unsigned indexCol = 0;
+
+		unsigned HeaderColIndex = 0;
+		unsigned HeaderRowIndex = 0;
+		char current;
+		while (true) {
+			if (ifs.eof()) {
+				break;
+			}
+			current = ifs.get();
+			if (current == '<') {
+				ifs.seekg(-1, std::ios::cur);
+				ifs.getline(buff, 2048, '>');
+
+
+				if (isStartTag("<tr", buff)) {
+					indexRow++;
+					indexCol = 0;
+					HeaderRowIndex++;
+					HeaderColIndex = 0;
+				}
+				else if (isStartTag("<th", buff)) {
+					table.isHeader[HeaderRowIndex][HeaderColIndex++]=true;
+					ifs.getline(buff, 2048, '<');
+					HTMLremove(buff,newBuff);
+					strcpy(table.table[indexRow][indexCol], newBuff);
+					indexCol++;
+				}
+				else if (isStartTag("<td", buff)) {
+					//table.isHeader[HeaderRowIndex][HeaderColIndex] = true;
+					HeaderColIndex++;
+					ifs.getline(buff, 2048, '<');
+					HTMLremove(buff, newBuff);
+					strcpy(table.table[indexRow][indexCol], newBuff);
+					indexCol++;
+				}
+
+
+
+			}
+
+
+
+		}
+
+	
+		
+	}
+
+	unsigned findCellWithMaxLength(size_t colIndex) {
+		unsigned maxLength = 0;
+		unsigned curLength = 0;
+		for (size_t i = 1; i <= rows_count; i++)
+		{
+			curLength = strlen(table[i][colIndex]);
+			if (curLength > maxLength)
+				maxLength = curLength;
+		}
+
+		return maxLength;
+	}
+
+	 void printTable() {
+		 for (int i = 1; i <=rows_count; i++)
+		 {
+			 
+				 for (int j = 0; j <cols_count; j++)
+				 {
+					 std::cout << '|';
+					 if (isHeader[i][j] == true) {
+						 std::cout << '*';
+					 }
+					 else {
+						 std::cout << ' ';
+					 }
+					 std::cout <<table[i][j];
+
+					 unsigned length = findCellWithMaxLength(j) - strlen(table[i][j]);
+					 for (size_t i = 0; i < length; i++)
+					 {
+						 std::cout << " ";
+					 }
+
+					 if (isHeader[i][j] == true) {
+						 std::cout << '*';
+					 }
+					 else {
+						 std::cout << ' ';
+					 }
+				 }
+
+				 std::cout << "|" << std::endl;
+		 }
+
+
+
+	}
+	 void removeRow(size_t rowNumber) {
+		 if (rowNumber >= rows_count) {
+			 return;
+		 }
+
+		 for (size_t i = rowNumber; i < rows_count; i++)
+		 {
+			 for (size_t j = 0; j < cols_count; j++)
+			 {
+				 strcpy(table[i][j], table[i + 1][j]);
+
+			 }
+		 }
+		 
+		 for (size_t i = 0; i < cols_count; i++)
+		 {
+			 strcpy(table[rows_count][i], "");
+		 }
+		 rows_count--;
+	 }
+	 void addRow(const char* val[], unsigned numValues) {
+		 if (rows_count >= MAX_SIZE_ROWS) {
+			 return;
+		 }
+
+		 if (numValues != cols_count) {
+			 return;
+		 }
+
+		 for (unsigned j = 0; j < cols_count; ++j) {
+			 strcpy(table[rows_count][j], val[j]);
+		 }
+
+	 }
+	 void editCell(unsigned RowNumber, unsigned ColNumber, const char* NewValue) {
+		 if (RowNumber >= rows_count || ColNumber >= cols_count) {
+			 return;
+		 }
+		 strcpy(table[RowNumber][ColNumber], NewValue);
+	 }
+
+
+
+	const char* HTMLremove(const char* str, char* result) {
+		std::stringstream ss(str);
+		char current = 0;
+		short index = 0;
+		int number = 0;
+		while (ss.get(current)) {
+			if (ss.eof()) {
+				break;
+			}
+			//current = ss.get();
+			if (current == '&') {
+				current = ss.get();
+				if (current == '#') {
+					char buffToStoreNums[50];
+					ss.getline(buffToStoreNums, 50);
+					char* ptr = buffToStoreNums;
+					int countToDigitEnd = 0;
+					while (isDigit(*ptr)) {
+						ptr++;
+						countToDigitEnd++;
+					}
+					buffToStoreNums[countToDigitEnd] = '\0';
+					for (int i = 0; i < countToDigitEnd; i++)
+					{
+						number = number * 10 + (buffToStoreNums[i] - '0');
+					}
+
+					char symbol = (char)number;
+					result[index] = symbol;
+					index++;
+
+					ss.clear();
+					ss.seekg((size_t)ss.tellg() -2, std::ios::beg);
+				}
+			}
+			else {
+				result[index] = current;
+				index++;
+			}
+
+		}
+		result[index] = '\0';
+		return result;
+
+	}
+
+};
+
+
+
+int main() {
+	std::ifstream ifs("table.txt");
+	if (!ifs.is_open()) {
+		return -1;
+	}
+
+	Table table;
+
+	table.getRowsCount(ifs);
+	table.getColPerRow(ifs);
+	table.ReadFileIntoTable(ifs, table);
+	table.removeRow(2);
+	table.printTable();
+	return 0;
+}
